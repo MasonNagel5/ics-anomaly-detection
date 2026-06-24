@@ -1,14 +1,16 @@
-class MyClass:
-    """Starter class example."""
-
-    def __init__(self, value=None):
-        self.value = value
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(value={self.value!r})"
-
-    def get_value(self):
-        return self.value
-
-    def set_value(self, value):
-        self.value = value
+class SensorReading:
+    def __init__(self, datetime, tanks, pumps, valve, pressures, att_flag):
+        self.datetime = datetime
+        self.tanks = tanks        # dict
+        self.pumps = pumps        # dict
+        self.valve = valve        # dict
+        self.pressures = pressures  # dict
+        self.att_flag = att_flag # BOOL flag 1 or 0
+        
+        # Flags for each of the 5 rules, initialized to FALSE
+        self.flagged = False 
+        self.flag_r1 = False
+        self.flag_r2 = False
+        self.flag_r3 = False
+        self.flag_r4 = False
+        self.flag_r5 = False

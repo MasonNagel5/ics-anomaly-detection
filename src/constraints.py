@@ -1,9 +1,9 @@
-def dead_pump_with_flow(state, flow):
-    if state == 0 and flow > 0.5:
+def dead_pump_with_flow(pump_state_sensor, flow_sensor):
+    if pump_state_sensor.value == 0 and flow_sensor.value > 0.5:
         return True
 
-def running_pump_with_no_flow(state, flow):
-    if state == 1 and flow < 0.5:
+def running_pump_with_no_flow(pump_state_sensor, flow_sensor):
+    if pump_state_sensor.value == 1 and flow_sensor.value < 0.5:
         return True
 def tank_dropping_too_fast():
     # this requires finding the max legit drop rate from the normal data.
