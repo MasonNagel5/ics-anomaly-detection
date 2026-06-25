@@ -1,0 +1,24 @@
+title: Running Pump Reporting No Flow
+id: 7d3c5b92-e104-4f81-b6a7-2e9d0c4f1a85
+status: experimental
+description: >
+    A pump with status on (1) is reporting near-zero flow.
+    This is physically impossible under normal operation and indicates
+    a spoofed status reading or manipulation of flow sensor values.
+author: MasonNagel5
+date: 2026/06/25
+references:
+    - https://github.com/MasonNagel5/ics-anomaly-detection
+logsource:
+    category: ics
+    product: batadal
+detection:
+    selection:
+        pump_status: 1
+        pump_flow|lt: 0.5
+    condition: selection
+falsepositives:
+    - Pump startup transient before flow stabilises
+level: high
+tags:
+    - attack.ics.t0831
