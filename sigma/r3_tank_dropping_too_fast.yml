@@ -1,0 +1,28 @@
+title: Tank Level Dropping Faster Than Normal
+id: 2b8e4d61-f273-4c90-a1b9-3d7f0e5c2a96
+status: experimental
+description: >
+    A tank level is dropping faster between consecutive readings than was
+    ever observed during normal operation in the training period.
+    Indicates possible manipulation of tank outflow or spoofed level readings
+    designed to trigger emergency pump activation.
+author: MasonNagel5
+date: 2026/06/25
+references:
+    - https://github.com/MasonNagel5/ics-anomaly-detection
+logsource:
+    category: ics
+    product: batadal
+detection:
+    selection:
+        tank_level_drop|gt: 0
+    condition: selection
+    # Note: the threshold is per-tank and calculated dynamically from training data.
+    # tank_level_drop = prev_tank_level - current_tank_level
+    # flag when tank_level_drop exceeds the maximum drop seen in normal operation for that tank.
+    # This rule requires a lookup or enrichment step before evaluation.
+falsepositives:
+    - Rapid legitimate demand increase during peak hours
+level: high
+tags:
+    - attack.ics.t0832
