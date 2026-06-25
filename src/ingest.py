@@ -63,46 +63,47 @@ def load_dataset(data_file):
                                             # This allows for easier handling of the data later when we run our anomaly detection algorithms
     return dataset
 
-dataset_03 = load_dataset(data_file_1)  # Store the return value of function
-dataset_04 = load_dataset(data_file_2)  # dataset04 contains attack data with att_flag = -999 (labels withheld)
+if __name__ == "__main__":
+    dataset_03 = load_dataset(data_file_1)  # Store the return value of function
+    dataset_04 = load_dataset(data_file_2)  # dataset04 contains attack data with att_flag = -999 (labels withheld)
 
-conn = psycopg2.connect(  # Establish a connection to the database
-    host=os.getenv("DB_HOST"),
-    database=os.getenv("DB_NAME"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD")
-)
+    conn = psycopg2.connect(  # Establish a connection to the database
+        host=os.getenv("DB_HOST"),
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD")
+    )
 
-cursor = conn.cursor()  # Cursor object is used to interact with DB
+    cursor = conn.cursor()  # Cursor object is used to interact with DB
 
-def insert_dataset(cursor, dataset):
-    for reading in dataset:
-        cursor.execute(
-            "INSERT INTO sensor_readings (datetime, att_flag) VALUES (%s, %s) RETURNING id",
-            (reading.datetime, reading.att_flag)
-        )
-        reading_id = cursor.fetchone()[0]  # Get the ID of the inserted reading
-        for key, value in reading.tanks.items():  # key = "T1", value = 0.509
+    def insert_dataset(cursor, dataset):
+        for reading in dataset:
             cursor.execute(
-                "INSERT INTO tank_readings (reading_id, tank_id, tank_level) VALUES (%s, %s, %s)",
-                (reading_id, key, value)
+                "INSERT INTO sensor_readings (datetime, att_flag) VALUES (%s, %s) RETURNING id",
+                (reading.datetime, reading.att_flag)
             )
-        for key, value in reading.pumps.items():
+            reading_id = cursor.fetchone()[0]  # Get the ID of the inserted reading
+            for key, value in reading.tanks.items():  # key = "T1", value = 0.509
+                cursor.execute(
+                    "INSERT INTO tank_readings (reading_id, tank_id, tank_level) VALUES (%s, %s, %s)",
+                    (reading_id, key, value)
+                )
+            for key, value in reading.pumps.items():
+                cursor.execute(
+                    "INSERT INTO pump_readings (reading_id, pump_id, flow, status) VALUES (%s, %s, %s, %s)",
+                    (reading_id, key, value["flow"], value["status"])  # Different here because it is not just a key value pair, there is a key that leads to multiple values
+                )
             cursor.execute(
-                "INSERT INTO pump_readings (reading_id, pump_id, flow, status) VALUES (%s, %s, %s, %s)",
-                (reading_id, key, value["flow"], value["status"])  # Different here because it is not just a key value pair, there is a key that leads to multiple values
+                "INSERT INTO valve_readings (reading_id, flow, status) VALUES (%s, %s, %s)",
+                (reading_id, reading.valve["flow"], reading.valve["status"])
             )
-        cursor.execute(
-            "INSERT INTO valve_readings (reading_id, flow, status) VALUES (%s, %s, %s)",
-            (reading_id, reading.valve["flow"], reading.valve["status"])
-        )
-        for key, value in reading.pressures.items():
-            cursor.execute(
-                "INSERT INTO pressure_readings (reading_id, junction_id, pressure) VALUES (%s, %s, %s)",
-                (reading_id, key, value)
-            )
+            for key, value in reading.pressures.items():
+                cursor.execute(
+                    "INSERT INTO pressure_readings (reading_id, junction_id, pressure) VALUES (%s, %s, %s)",
+                    (reading_id, key, value)
+                )
 
-insert_dataset(cursor, dataset_03)
-insert_dataset(cursor, dataset_04)
+    insert_dataset(cursor, dataset_03)
+    insert_dataset(cursor, dataset_04)
 
-conn.commit()  # Commit the transaction to save changes to the database
+    conn.commit()  # Commit the transaction to save changes to the database
