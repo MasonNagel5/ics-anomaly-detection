@@ -1,0 +1,24 @@
+title: Dead Pump Reporting Flow
+id: 4a1f2e83-bc91-4d70-a3e5-1f8c9d2b0e74
+status: experimental
+description: >
+    A pump with status off (0) is reporting significant flow.
+    This is physically impossible and indicates sensor manipulation
+    or a spoofed status reading designed to hide unauthorized pump activity.
+author: MasonNagel5
+date: 2026/06/25
+references:
+    - https://github.com/MasonNagel5/ics-anomaly-detection
+logsource:
+    category: ics
+    product: batadal
+detection:
+    selection:
+        pump_status: 0
+        pump_flow|gt: 0.5
+    condition: selection
+falsepositives:
+    - Residual flow immediately after pump shutdown
+level: high
+tags:
+    - attack.ics.t0831
