@@ -1,0 +1,41 @@
+# Splunk SPL conversions for BATADAL Sigma rules
+# These queries assume pump and tank readings are indexed under index=scada
+# with sourcetypes pump_readings and tank_readings respectively.
+
+
+# R1 - Dead Pump Reporting Flow
+# Equivalent to r1_dead_pump_with_flow.yml
+index=scada sourcetype=pump_readings pump_status=0 pump_flow>0.5
+| table _time, pump_id, pump_flow, pump_status
+| sort _time
+
+
+# R2 - Running Pump Reporting No Flow
+# Equivalent to r2_running_pump_no_flow.yml
+index=scada sourcetype=pump_readings pump_status=1 pump_flow<0.5
+| table _time, pump_id, pump_flow, pump_status
+| sort _time
+
+
+# R3 - Tank Dropping Too Fast
+# Equivalent to r3_tank_dropping_too_fast.yml
+# Uses streamstats to compute level drop between consecutive readings per tank.
+# Replace the threshold values with per-tank maximums derived from training data.
+index=scada sourcetype=tank_readings
+| sort _time
+| streamstats window=2 current=true last(tank_level) as prev_level by tank_id
+| eval level_drop=prev_level-tank_level
+| lookup tank_drop_thresholds tank_id OUTPUT max_drop
+| where level_drop>max_drop
+| table _time, tank_id, tank_level, prev_level, level_drop, max_drop
+| sort _time
+
+
+# R4 - Tank Level Too High
+# Equivalent to r4_tank_level_too_high.yml
+# Requires a lookup table tank_thresholds.csv with fields tank_id, max_normal_level.
+index=scada sourcetype=tank_readings
+| lookup tank_thresholds tank_id OUTPUT max_normal_level
+| where tank_level>max_normal_level
+| table _time, tank_id, tank_level, max_normal_level
+| sort _time
