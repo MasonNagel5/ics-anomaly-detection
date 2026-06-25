@@ -8,21 +8,20 @@ load_dotenv()  # Load environment variables from .env file
 
 DATA_FILENAME_1 = "BATADAL_dataset03.csv"
 DATA_FILENAME_2 = "BATADAL_dataset04.csv"
-DATA_FILENAME_3 = "BATADAL_test_dataset.csv"
 
-dataset_04 = []
-test_dataset = []
 # locate project root from this file to make sure dataset is found regardless of where the script is run from
 data_file_1 = Path(__file__).resolve().parents[1] / "data" / DATA_FILENAME_1
 data_file_2 = Path(__file__).resolve().parents[1] / "data" / DATA_FILENAME_2
-data_file_3 = Path(__file__).resolve().parents[1] / "data" / DATA_FILENAME_3
 
 if not data_file_1.exists():
     raise FileNotFoundError(f"Data file not found: {data_file_1}")
-def load_dataset03():
-    dataset_03 = []
+if not data_file_2.exists():
+    raise FileNotFoundError(f"Data file not found: {data_file_2}")
 
-    with data_file_1.open('r', newline='') as file:
+def load_dataset(data_file):
+    dataset = []
+
+    with data_file.open('r', newline='') as file:
         reader = csv.reader(file)
         header = next(reader)
         for row in reader:
@@ -48,7 +47,7 @@ def load_dataset03():
                 "PU11": {"flow": float(row[28]), "status": int(float(row[29]))}
             }
 
-            valve = {"flow": float(row[30]), "status": int(float(row[31]))} # fields such as 1.00 so we need float conversion and then int conversion
+            valve = {"flow": float(row[30]), "status": int(float(row[31]))}  # fields such as 1.00 so we need float conversion and then int conversion
 
             pressures = {
                 "J280": float(row[32]), "J269": float(row[33]), "J300": float(row[34]),
@@ -60,45 +59,50 @@ def load_dataset03():
             att_flag = int(float(row[44]))
 
             sensor_reading = SensorReading(datetime, tanks, pumps, valve, pressures, att_flag)
-            dataset_03.append(sensor_reading) # Populates an array with SensorReading objects, each one representing one row of the CSV
+            dataset.append(sensor_reading)  # Populates an array with SensorReading objects, each one representing one row of the CSV
                                             # This allows for easier handling of the data later when we run our anomaly detection algorithms
-    return dataset_03
-        
-dataset_03 = load_dataset03() # Store the return value of function
+    return dataset
 
-conn = psycopg2.connect( #Establish a connection to the database
+dataset_03 = load_dataset(data_file_1)  # Store the return value of function
+dataset_04 = load_dataset(data_file_2)  # dataset04 contains attack data with att_flag = -999 (labels withheld)
+
+conn = psycopg2.connect(  # Establish a connection to the database
     host=os.getenv("DB_HOST"),
     database=os.getenv("DB_NAME"),
     user=os.getenv("DB_USER"),
     password=os.getenv("DB_PASSWORD")
 )
 
-cursor = conn.cursor() # Cursor object is used to interact with DB
+cursor = conn.cursor()  # Cursor object is used to interact with DB
 
-for reading in dataset_03:
-    cursor.execute(
-        "INSERT INTO sensor_readings (datetime, att_flag) VALUES (%s, %s) RETURNING id",
-        (reading.datetime, reading.att_flag)
-    )
-    reading_id = cursor.fetchone()[0]  # Get the ID of the inserted reading
-    for key, value in reading.tanks.items(): # key = "T1", value = 0.509 
+def insert_dataset(cursor, dataset):
+    for reading in dataset:
         cursor.execute(
-            "INSERT INTO tank_readings (reading_id, tank_id, tank_level) VALUES (%s, %s, %s)",
-            (reading_id, key, value)
+            "INSERT INTO sensor_readings (datetime, att_flag) VALUES (%s, %s) RETURNING id",
+            (reading.datetime, reading.att_flag)
         )
-    for key, value in reading.pumps.items(): 
+        reading_id = cursor.fetchone()[0]  # Get the ID of the inserted reading
+        for key, value in reading.tanks.items():  # key = "T1", value = 0.509
+            cursor.execute(
+                "INSERT INTO tank_readings (reading_id, tank_id, tank_level) VALUES (%s, %s, %s)",
+                (reading_id, key, value)
+            )
+        for key, value in reading.pumps.items():
+            cursor.execute(
+                "INSERT INTO pump_readings (reading_id, pump_id, flow, status) VALUES (%s, %s, %s, %s)",
+                (reading_id, key, value["flow"], value["status"])  # Different here because it is not just a key value pair, there is a key that leads to multiple values
+            )
         cursor.execute(
-            "INSERT INTO pump_readings (reading_id, pump_id, flow, status) VALUES (%s, %s, %s, %s)",
-            (reading_id, key, value["flow"], value["status"]) # Different here because it is not just a key value pair, there is a key that leads to multiple values
+            "INSERT INTO valve_readings (reading_id, flow, status) VALUES (%s, %s, %s)",
+            (reading_id, reading.valve["flow"], reading.valve["status"])
         )
-    cursor.execute(
-    "INSERT INTO valve_readings (reading_id, flow, status) VALUES (%s, %s, %s)",
-    (reading_id, reading.valve["flow"], reading.valve["status"])
-    
-)
-    for key, value in reading.pressures.items():
-        cursor.execute(
-            "INSERT INTO pressure_readings (reading_id, junction_id, pressure) VALUES (%s, %s, %s)",
-            (reading_id, key, value)
-        )
-conn.commit() # Commit the transaction to save changes to the database
+        for key, value in reading.pressures.items():
+            cursor.execute(
+                "INSERT INTO pressure_readings (reading_id, junction_id, pressure) VALUES (%s, %s, %s)",
+                (reading_id, key, value)
+            )
+
+insert_dataset(cursor, dataset_03)
+insert_dataset(cursor, dataset_04)
+
+conn.commit()  # Commit the transaction to save changes to the database
