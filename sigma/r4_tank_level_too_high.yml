@@ -1,0 +1,25 @@
+title: Tank Level Exceeds Historical Maximum
+id: 9f5a7c30-d482-4b53-e8c1-4a2e1f6d3b07
+status: experimental
+description: >
+    A tank level reading exceeds the highest level ever recorded during normal
+    operation in the training period. Indicates possible sensor spoofing
+    designed to suppress pump activation by falsely reporting a full tank.
+author: MasonNagel5
+date: 2026/06/25
+references:
+    - https://github.com/MasonNagel5/ics-anomaly-detection
+logsource:
+    category: ics
+    product: batadal
+detection:
+    selection:
+        tank_level|gt: max_normal_level
+    condition: selection
+    # Note: max_normal_level is per-tank and derived from training data.
+    # This rule requires a lookup table keyed on tank_id before evaluation.
+falsepositives:
+    - Sensor calibration drift over long operating periods
+level: high
+tags:
+    - attack.ics.t0832
