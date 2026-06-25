@@ -18,6 +18,7 @@ dataset_04 = load_dataset(data_file_2)
 
 tank_thresholds = calculate_tank_thresholds(dataset_03)
 drop_thresholds = calculate_drop_thresholds(dataset_03)
+hourly_baselines = calculate_hourly_baselines(dataset_03)
 
 for reading in dataset_04:
     if dead_pump_with_flow(reading):
@@ -38,14 +39,19 @@ for i in range(1, len(dataset_04)):
         current.flagged = True
 
 for reading in dataset_04:
+    if tank_level_hourly_anomaly(reading, hourly_baselines):
+        reading.flag_r6 = True
+        reading.flagged = True
+
+for reading in dataset_04:
     if multi_sensor_coorelation_anomaly(reading):
         reading.flag_r5 = True
         reading.flagged = True
 
 for reading in dataset_04:
     if reading.flagged == True:
-        cursor.execute("UPDATE sensor_readings SET detected = 1 WHERE datetime = %s",
-        (reading.datetime,)
+        cursor.execute("UPDATE sensor_readings SET detected = 1, flag_r6 = %s WHERE datetime = %s",
+        (1 if reading.flag_r6 else 0, reading.datetime)
 )
 
 conn.commit()
